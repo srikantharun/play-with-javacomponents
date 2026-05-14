@@ -1,0 +1,64 @@
+spec:
+  component: [name, sha, version]
+  inputs:
+    java_version:
+      default: "25"
+      description: "Java version"
+      options: ["21", "25"]
+      type: string
+    k6_test_file:
+      default: ""
+      description: "Path to K6 test script (required to enable performance tests)"
+      type: string
+    # Standard Component inputs
+    component_context_dir:
+      default: "./"
+      description: "Working directory in which this Component will execute"
+      regex: ^([a-z.][a-zA-Z0-9-_/]+)?$
+      type: string
+    job_name_prefix:
+      default: ""
+      description: "Prefix for all component jobs"
+      regex: ^([a-z][a-z0-9-]+::)*$
+      type: string
+    job_stage:
+      default: "integration-test"
+      description: "Pipeline stage in which jobs are run"
+      type: string
+---
+include:
+  - local: /templates/shared/common.yml
+    inputs:
+      component_context_dir: "$[[ inputs.component_context_dir ]]"
+      job_name_prefix: "$[[ inputs.job_name_prefix ]]"
+      job_stage: "$[[ inputs.job_stage ]]"
+      _component_image: "$CI_TEMPLATE_REGISTRY_HOST/dwp/engineering/pipeline-solutions/gitlab/components/java:$[[ component.sha ]]-jdk$[[ inputs.java_version ]]"
+  # Include load performance testing fragment
+  - project: "dwp/engineering/pipeline-solutions/gitlab/fragments/load-performance-testing"
+    ref: 1.3.0
+    file: "ci-include-load-performance.yml"
+
+variables:
+  RUN_K6_PERFORMANCE_TESTS: "true"
+  K6_TEST_FILE: "$[[ inputs.k6_test_file ]]"
+
+# Hidden rules for load performance
+.load-performance-rules:
+  rules:
+    - if: $K6_TEST_FILE == ""
+      when: never
+    - if: $RUN_K6_PERFORMANCE_TESTS != "true"
+      when: never
+
+# K6 Load performance testing
+"$[[ inputs.job_name_prefix ]]java::performance::k6":
+  extends: ".$[[ inputs.job_name_prefix ]]java::common"
+  needs:
+    - job: "$[[ inputs.job_name_prefix ]]java::docker::build"
+      optional: true
+  rules:
+    - !reference [.load-performance-rules, rules]
+    - when: on_success
+  script: |
+    echo "Running K6 performance tests..."
+    echo "Test file: $K6_TEST_FILE"

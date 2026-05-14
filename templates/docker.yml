@@ -1,0 +1,61 @@
+spec:
+  component: [name, sha, version]
+  inputs:
+    java_version:
+      default: "25"
+      description: "Java version"
+      options: ["21", "25"]
+      type: string
+    dockerfile:
+      default: "Dockerfile"
+      description: "Path to Dockerfile"
+      type: string
+    # Standard Component inputs
+    component_context_dir:
+      default: "./"
+      description: "Working directory in which this Component will execute"
+      regex: ^([a-z.][a-zA-Z0-9-_/]+)?$
+      type: string
+    job_name_prefix:
+      default: ""
+      description: "Prefix for all component jobs"
+      regex: ^([a-z][a-z0-9-]+::)*$
+      type: string
+    job_stage:
+      default: "package"
+      description: "Pipeline stage in which jobs are run"
+      type: string
+---
+include:
+  - local: /templates/shared/common.yml
+    inputs:
+      component_context_dir: "$[[ inputs.component_context_dir ]]"
+      job_name_prefix: "$[[ inputs.job_name_prefix ]]"
+      job_stage: "$[[ inputs.job_stage ]]"
+      _component_image: "$CI_TEMPLATE_REGISTRY_HOST/dwp/engineering/pipeline-solutions/gitlab/components/java:$[[ component.sha ]]-jdk$[[ inputs.java_version ]]"
+  # Include docker function from external project
+  - project: dwp/engineering/pipeline-solutions/gitlab/functions
+    ref: 7.1.6
+    file:
+      - functions/docker-mr.gitlab-ci.yml
+
+# Docker build
+# Optional needs only work if the job exists in the merged yml (https://docs.gitlab.com/ee/ci/yaml/#needsoptional),
+# but where the job sometimes not in a given pipeline due to it's rules
+# So instead we override docker-build in orchestration templates in order to kick it off as soon as
+# maven-package (if it exists otherwise when maven-dependencies) and docker-lint have finished
+"$[[ inputs.job_name_prefix ]]java::docker::build":
+  extends: ".$[[ inputs.job_name_prefix ]]java::common"
+  needs:
+    - job: "$[[ inputs.job_name_prefix ]]java::lint::hadolint"
+      optional: true  # won't be run on main branches for teams using FF_MERGE optimisations, so must be an optional need
+    - job: "$[[ inputs.job_name_prefix ]]java::build::package"
+      optional: true
+    - job: "$[[ inputs.job_name_prefix ]]java::build::dependencies"
+      optional: true
+  variables:
+    DOCKERFILE: "$[[ inputs.dockerfile ]]"
+  script: |
+    echo "Building Docker image..."
+    docker build -f "$DOCKERFILE" -t "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA" .
+    docker push "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA"

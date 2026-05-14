@@ -1,0 +1,32 @@
+spec:
+  inputs:
+    component_context_dir:
+    job_name_prefix:
+    job_stage:
+    # Private variables.
+    _component_image:
+---
+
+".$[[ inputs.job_name_prefix ]]java::common":
+  before_script:
+    # Switch working directory.
+    - cd "$[[ inputs.component_context_dir ]]"
+  image: $[[ inputs._component_image ]]
+  inherit:
+    # Do not allow global default job configs to override our jobs.
+    default: false
+    # By default, do not inherit any global default CI variables.
+    variables: false
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+      - scheduler_failure
+  stage: $[[ inputs.job_stage ]]
+  tags:
+    - dwp-aws-x86-linux-l
+  variables:
+    # Ensures that the exit code sent from bash scripts is correctly evaluated
+    # by the job script.
+    FF_USE_NEW_BASH_EVAL_STRATEGY: "true"

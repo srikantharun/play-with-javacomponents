@@ -1,0 +1,116 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: java-components
+  description: GitLab CI/CD Components for Java applications
+  labels:
+    tier: platform
+  tags:
+    - gitlab-ci
+    - java
+    - maven
+    - components
+  annotations:
+    gitlab.com/project-slug: dwp/engineering/pipeline-solutions/gitlab/components/java
+spec:
+  type: library
+  lifecycle: production
+  owner: group:devx-working-group
+  providesApis: []
+  consumesApis: []
+---
+# Individual component registrations
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: java-lint
+  description: Static code analysis for Java (Checkstyle, SpotBugs, PMD)
+  tags:
+    - lint
+    - checkstyle
+    - spotbugs
+spec:
+  type: ci-component
+  lifecycle: production
+  owner: group:devx-working-group
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: java-build
+  description: Maven build and dependency management
+  tags:
+    - build
+    - maven
+spec:
+  type: ci-component
+  lifecycle: production
+  owner: group:devx-working-group
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: java-test
+  description: Unit and integration testing for Java
+  tags:
+    - test
+    - junit
+spec:
+  type: ci-component
+  lifecycle: production
+  owner: group:devx-working-group
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: java-api-test
+  description: API testing with Wiremock
+  tags:
+    - api
+    - wiremock
+    - integration-test
+spec:
+  type: ci-component
+  lifecycle: production
+  owner: group:devx-working-group
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: java-docker
+  description: Docker image building for Java applications
+  tags:
+    - docker
+    - container
+spec:
+  type: ci-component
+  lifecycle: production
+  owner: group:devx-working-group
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: java-security
+  description: Static security analysis (SonarQube, container scanning)
+  tags:
+    - security
+    - sast
+    - sonarqube
+spec:
+  type: ci-component
+  lifecycle: production
+  owner: group:devx-working-group
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: java-app-pipeline
+  description: Meta-component composing all Java components for backend applications
+  tags:
+    - meta
+    - backend
+    - pipeline
+spec:
+  type: ci-component
+  lifecycle: production
+  owner: group:devx-working-group

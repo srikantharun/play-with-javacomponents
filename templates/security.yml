@@ -1,0 +1,101 @@
+spec:
+  component: [name, sha, version]
+  inputs:
+    java_version:
+      default: "25"
+      description: "Java version"
+      options: ["21", "25"]
+      type: string
+    run_sonarqube:
+      default: true
+      description: "Run SonarQube analysis"
+      type: boolean
+    run_container_scanning:
+      default: true
+      description: "Run container vulnerability scanning"
+      type: boolean
+    run_virus_scan:
+      default: true
+      description: "Run virus scanning on artifacts"
+      type: boolean
+    # Standard Component inputs
+    component_context_dir:
+      default: "./"
+      description: "Working directory in which this Component will execute"
+      regex: ^([a-z.][a-zA-Z0-9-_/]+)?$
+      type: string
+    job_name_prefix:
+      default: ""
+      description: "Prefix for all component jobs"
+      regex: ^([a-z][a-z0-9-]+::)*$
+      type: string
+    job_stage:
+      default: "security-static-analysis"
+      description: "Pipeline stage in which jobs are run"
+      type: string
+---
+include:
+  - local: /templates/shared/common.yml
+    inputs:
+      component_context_dir: "$[[ inputs.component_context_dir ]]"
+      job_name_prefix: "$[[ inputs.job_name_prefix ]]"
+      job_stage: "$[[ inputs.job_stage ]]"
+      _component_image: "$CI_TEMPLATE_REGISTRY_HOST/dwp/engineering/pipeline-solutions/gitlab/components/java:$[[ component.sha ]]-jdk$[[ inputs.java_version ]]"
+
+# SonarQube analysis
+"$[[ inputs.job_name_prefix ]]java::security::sonarqube":
+  extends: ".$[[ inputs.job_name_prefix ]]java::common"
+  needs:
+    - job: "$[[ inputs.job_name_prefix ]]java::test::unit"
+      optional: true
+  rules:
+    - if: '"$[[ inputs.run_sonarqube ]]" == "true"'
+  script: |
+    echo "Running SonarQube analysis..."
+    mvn sonar:sonar \
+      -Dmaven.repo.local=.m2-local \
+      -s /component/shared/settings.xml
+
+# Container scanning
+"$[[ inputs.job_name_prefix ]]java::security::container-scan":
+  extends: ".$[[ inputs.job_name_prefix ]]java::common"
+  needs:
+    - job: "$[[ inputs.job_name_prefix ]]java::docker::build"
+      optional: true
+  rules:
+    - if: '"$[[ inputs.run_container_scanning ]]" == "true"'
+  script: |
+    echo "Running container vulnerability scanning..."
+
+# Container scanning with Cosign
+"$[[ inputs.job_name_prefix ]]java::security::cosign-vuln":
+  extends: ".$[[ inputs.job_name_prefix ]]java::common"
+  needs:
+    - job: "$[[ inputs.job_name_prefix ]]java::docker::build"
+      optional: true
+  rules:
+    - if: '"$[[ inputs.run_container_scanning ]]" == "true"'
+  script: |
+    echo "Running Cosign vulnerability scan..."
+
+# Container structure test
+"$[[ inputs.job_name_prefix ]]java::security::container-structure":
+  extends: ".$[[ inputs.job_name_prefix ]]java::common"
+  needs:
+    - job: "$[[ inputs.job_name_prefix ]]java::docker::build"
+      optional: true
+  rules:
+    - if: '"$[[ inputs.run_container_scanning ]]" == "true"'
+  script: |
+    echo "Running container structure tests..."
+
+# Virus scan
+"$[[ inputs.job_name_prefix ]]java::security::virus-scan":
+  extends: ".$[[ inputs.job_name_prefix ]]java::common"
+  needs:
+    - job: "$[[ inputs.job_name_prefix ]]java::build::package"
+      optional: true
+  rules:
+    - if: '"$[[ inputs.run_virus_scan ]]" == "true"'
+  script: |
+    echo "Running virus scan on artifacts..."

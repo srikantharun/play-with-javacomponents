@@ -1,0 +1,54 @@
+spec:
+  inputs: {}
+---
+
+# Optimised job rules for fast-forward merge pipelines
+# These rules minimize redundant job runs while maintaining security
+
+.optimised-rules:
+  # Standard optimised rules for most jobs
+  optimised-job-rules:
+    # Run on main only when manually triggered from UI or via a schedule
+    - if: '$CI_COMMIT_REF_NAME == "main" && ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "schedule")'
+      when: always
+    # Skip other automatic pipelines on main
+    - if: '$CI_COMMIT_REF_NAME == "main"'
+      when: never
+    # Block pipelines from the automation branch unless started from UI
+    - if: '($CI_COMMIT_BRANCH == "chore/auto-package-main" || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == "chore/auto-package-main") && $CI_PIPELINE_SOURCE != "web"'
+      when: never
+    # Do not run on both commit branch and open merge request at the same time
+    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
+      when: never
+    # Default: run on all other branches/MRs
+    - when: always
+
+  # Shell-check specific rules
+  shell-check-rules:
+    - !reference [.optimised-rules, optimised-job-rules]
+
+  # Load performance specific rules
+  load-performance-rules:
+    - if: $RUN_K6_PERFORMANCE_TESTS != "true"
+      when: never
+    - !reference [.optimised-rules, optimised-job-rules]
+
+  # SonarQube specific rules
+  sonarqube-rules:
+    - !reference [.optimised-rules, optimised-job-rules]
+
+  # Mutation testing specific rules
+  mutation-testing-rules:
+    - !reference [.optimised-rules, optimised-job-rules]
+
+  # Container structure test rules
+  container-structure-rules:
+    - !reference [.optimised-rules, optimised-job-rules]
+
+  # API fuzzer rules
+  api-fuzzer-rules:
+    - !reference [.optimised-rules, optimised-job-rules]
+
+  # DAST API rules
+  dast-api-rules:
+    - !reference [.optimised-rules, optimised-job-rules]

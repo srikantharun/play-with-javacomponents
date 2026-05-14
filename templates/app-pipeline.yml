@@ -1,0 +1,226 @@
+spec:
+  component: [name, sha, version]
+  inputs:
+    # Application type inputs
+    has_api:
+      default: true
+      description: "Project exposes an HTTP API. Enables API tests, OpenAPI validation, API fuzzing, DAST API jobs."
+      type: boolean
+    use_wiremock:
+      default: true
+      description: "Project uses Wiremock for integration tests. Requires has_api=true."
+      type: boolean
+    # Feature toggles
+    run_performance_tests:
+      default: false
+      description: "Run K6 performance tests (requires k6_test_file)"
+      type: boolean
+    run_mutation_tests:
+      default: true
+      description: "Run PiTest mutation testing"
+      type: boolean
+    # Java configuration
+    java_version:
+      default: "25"
+      description: "Java version"
+      options: ["21", "25"]
+      type: string
+    k6_test_file:
+      default: ""
+      description: "Path to K6 test script (required if run_performance_tests=true)"
+      type: string
+    # Standard Component inputs
+    component_context_dir:
+      default: "./"
+      description: "Working directory in which this Component will execute"
+      regex: ^([a-z.][a-zA-Z0-9-_/]+)?$
+      type: string
+    job_name_prefix:
+      default: ""
+      description: "Prefix for all component jobs"
+      regex: ^([a-z][a-z0-9-]+::)*$
+      type: string
+---
+# =============================================================================
+# java/app-pipeline - Meta-component for Java backend applications
+#
+# This component composes the atomic java/* components into a complete
+# pipeline for typical Java backend applications.
+#
+# Legacy template mapping:
+#   java-backend                  -> has_api=true,  use_wiremock=true
+#   java-backend-without-wiremock -> has_api=true,  use_wiremock=false
+#   java-backend-no-api           -> has_api=false, use_wiremock=false
+#
+# Invalid combination: has_api=false, use_wiremock=true (rejected by validation job)
+# =============================================================================
+
+include:
+  # Shared configuration
+  - local: /templates/shared/common.yml
+    inputs:
+      component_context_dir: "$[[ inputs.component_context_dir ]]"
+      job_name_prefix: "$[[ inputs.job_name_prefix ]]"
+      job_stage: ".pre"
+      _component_image: "$CI_TEMPLATE_REGISTRY_HOST/dwp/engineering/pipeline-solutions/gitlab/components/java:$[[ component.sha ]]-jdk$[[ inputs.java_version ]]"
+
+  # === ALWAYS INCLUDED - Core components ===
+
+  # Lint component
+  - local: /templates/lint.yml
+    inputs:
+      java_version: "$[[ inputs.java_version ]]"
+      component_context_dir: "$[[ inputs.component_context_dir ]]"
+      job_name_prefix: "$[[ inputs.job_name_prefix ]]"
+      run_openapi_validation: "$[[ inputs.has_api ]]"
+
+  # Build component
+  - local: /templates/build.yml
+    inputs:
+      java_version: "$[[ inputs.java_version ]]"
+      component_context_dir: "$[[ inputs.component_context_dir ]]"
+      job_name_prefix: "$[[ inputs.job_name_prefix ]]"
+
+  # Test component
+  - local: /templates/test.yml
+    inputs:
+      java_version: "$[[ inputs.java_version ]]"
+      component_context_dir: "$[[ inputs.component_context_dir ]]"
+      job_name_prefix: "$[[ inputs.job_name_prefix ]]"
+
+  # Docker component
+  - local: /templates/docker.yml
+    inputs:
+      java_version: "$[[ inputs.java_version ]]"
+      component_context_dir: "$[[ inputs.component_context_dir ]]"
+      job_name_prefix: "$[[ inputs.job_name_prefix ]]"
+
+  # Security (static) component
+  - local: /templates/security.yml
+    inputs:
+      java_version: "$[[ inputs.java_version ]]"
+      component_context_dir: "$[[ inputs.component_context_dir ]]"
+      job_name_prefix: "$[[ inputs.job_name_prefix ]]"
+
+  # Release component
+  - local: /templates/release.yml
+    inputs:
+      java_version: "$[[ inputs.java_version ]]"
+      component_context_dir: "$[[ inputs.component_context_dir ]]"
+      job_name_prefix: "$[[ inputs.job_name_prefix ]]"
+
+# =============================================================================
+# Input validation - fail fast on invalid combinations
+# =============================================================================
+
+"$[[ inputs.job_name_prefix ]]java::app-pipeline::validate":
+  stage: .pre
+  extends: ".$[[ inputs.job_name_prefix ]]java::common"
+  script: |
+    echo "Validating app-pipeline inputs..."
+
+    # Invalid: use_wiremock=true requires has_api=true
+    if [[ "$[[ inputs.use_wiremock ]]" == "true" && "$[[ inputs.has_api ]]" == "false" ]]; then
+      echo "ERROR: Invalid input combination"
+      echo "  use_wiremock=true requires has_api=true"
+      echo "  Wiremock is used for API mocking - it doesn't make sense without an API"
+      echo ""
+      echo "To fix, either:"
+      echo "  - Set has_api: true (if your app exposes an API)"
+      echo "  - Set use_wiremock: false (if your app has no API)"
+      exit 70
+    fi
+
+    # Warning: performance tests enabled but no test file
+    if [[ "$[[ inputs.run_performance_tests ]]" == "true" && -z "$[[ inputs.k6_test_file ]]" ]]; then
+      echo "WARNING: run_performance_tests=true but k6_test_file is empty"
+      echo "Performance tests will be skipped. Set k6_test_file to enable them."
+    fi
+
+    echo "Input validation passed."
+    echo "  has_api: $[[ inputs.has_api ]]"
+    echo "  use_wiremock: $[[ inputs.use_wiremock ]]"
+    echo "  run_performance_tests: $[[ inputs.run_performance_tests ]]"
+    echo "  run_mutation_tests: $[[ inputs.run_mutation_tests ]]"
+  rules:
+    - when: always
+
+# =============================================================================
+# Conditional components - included based on inputs
+# =============================================================================
+
+# --- API Test component (only when has_api=true) ---
+"$[[ inputs.job_name_prefix ]]java::api-test::wiremock":
+  extends: ".$[[ inputs.job_name_prefix ]]java::common"
+  stage: integration-test
+  needs:
+    - job: "$[[ inputs.job_name_prefix ]]java::build::package"
+      optional: true
+  rules:
+    - if: '"$[[ inputs.has_api ]]" == "true" && "$[[ inputs.use_wiremock ]]" == "true"'
+  variables:
+    DISABLE_WIREMOCK: "false"
+  script: |
+    echo "Running Wiremock integration tests..."
+    mvn verify -Pwiremock \
+      -Dmaven.repo.local=.m2-local \
+      -s /component/shared/settings.xml
+
+# --- Security Dynamic component (only when has_api=true) ---
+"$[[ inputs.job_name_prefix ]]java::security-dynamic::api-fuzzer":
+  extends: ".$[[ inputs.job_name_prefix ]]java::common"
+  stage: security-dynamic-analysis
+  needs:
+    - job: "$[[ inputs.job_name_prefix ]]java::docker::build"
+      optional: true
+  rules:
+    - if: '"$[[ inputs.has_api ]]" == "true"'
+  script: |
+    echo "Running API fuzzing tests..."
+
+"$[[ inputs.job_name_prefix ]]java::security-dynamic::dast-api":
+  extends: ".$[[ inputs.job_name_prefix ]]java::common"
+  stage: security-dynamic-analysis
+  needs:
+    - job: "$[[ inputs.job_name_prefix ]]java::docker::build"
+      optional: true
+  rules:
+    - if: '"$[[ inputs.has_api ]]" == "true"'
+  script: |
+    echo "Running DAST API security tests..."
+
+# --- Mutation Test component (when run_mutation_tests=true) ---
+"$[[ inputs.job_name_prefix ]]java::mutation-test::pitest":
+  extends: ".$[[ inputs.job_name_prefix ]]java::common"
+  stage: security-static-analysis
+  needs:
+    - job: "$[[ inputs.job_name_prefix ]]java::test::unit"
+      optional: true
+  rules:
+    - if: '"$[[ inputs.run_mutation_tests ]]" == "true"'
+  artifacts:
+    expire_in: 1 week
+    paths:
+      - $[[ inputs.component_context_dir ]]/target/pit-reports/
+    when: always
+  script: |
+    echo "Running PiTest mutation testing..."
+    mvn org.pitest:pitest-maven:mutationCoverage \
+      -Dmaven.repo.local=.m2-local \
+      -s /component/shared/settings.xml
+
+# --- Performance component (when run_performance_tests=true and k6_test_file set) ---
+"$[[ inputs.job_name_prefix ]]java::performance::k6":
+  extends: ".$[[ inputs.job_name_prefix ]]java::common"
+  stage: integration-test
+  needs:
+    - job: "$[[ inputs.job_name_prefix ]]java::docker::build"
+      optional: true
+  rules:
+    - if: '"$[[ inputs.run_performance_tests ]]" == "true" && "$[[ inputs.k6_test_file ]]" != ""'
+  variables:
+    K6_TEST_FILE: "$[[ inputs.k6_test_file ]]"
+    RUN_K6_PERFORMANCE_TESTS: "true"
+  script: |
+    echo "Running K6 performance tests..."
+    echo "Test file: $K6_TEST_FILE"

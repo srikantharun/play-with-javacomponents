@@ -1,0 +1,50 @@
+spec:
+  component: [name, sha, version]
+  inputs:
+    java_version:
+      default: "25"
+      description: "Java version"
+      options: ["21", "25"]
+      type: string
+    publish_to_gitlab:
+      default: true
+      description: "Publish Maven artifacts to GitLab Package Registry"
+      type: boolean
+    # Standard Component inputs
+    component_context_dir:
+      default: "./"
+      description: "Working directory in which this Component will execute"
+      regex: ^([a-z.][a-zA-Z0-9-_/]+)?$
+      type: string
+    job_name_prefix:
+      default: ""
+      description: "Prefix for all component jobs"
+      regex: ^([a-z][a-z0-9-]+::)*$
+      type: string
+    job_stage:
+      default: ".post"
+      description: "Pipeline stage in which jobs are run"
+      type: string
+---
+include:
+  - local: /templates/shared/common.yml
+    inputs:
+      component_context_dir: "$[[ inputs.component_context_dir ]]"
+      job_name_prefix: "$[[ inputs.job_name_prefix ]]"
+      job_stage: "$[[ inputs.job_stage ]]"
+      _component_image: "$CI_TEMPLATE_REGISTRY_HOST/dwp/engineering/pipeline-solutions/gitlab/components/java:$[[ component.sha ]]-jdk$[[ inputs.java_version ]]"
+  # Include auto-tag-merge function from external project
+  - project: dwp/engineering/pipeline-solutions/gitlab/functions
+    ref: 7.1.6
+    file:
+      - functions/auto-tag-merge-mr.gitlab-ci.yml
+
+variables:
+  MAVEN_PUBLISH_TO_GITLAB: "$[[ inputs.publish_to_gitlab | then: 'true', else: 'false' ]]"
+
+# Note: The auto-tag-merge jobs are provided by the included function:
+# - auto-tag-merge-env-tag
+# - auto-tag-merge-apply
+# - auto-tag-merge-renovate-downstream-branches
+# - auto-tag-merge-env-package
+# - auto-tag-merge-prepare-mr

@@ -1,0 +1,61 @@
+spec:
+  component: [name, sha, version]
+  inputs:
+    java_version:
+      default: "25"
+      description: "Java version"
+      options: ["21", "25"]
+      type: string
+    run_api_fuzzer:
+      default: true
+      description: "Run API fuzzing tests"
+      type: boolean
+    run_dast_api:
+      default: true
+      description: "Run DAST API security testing"
+      type: boolean
+    # Standard Component inputs
+    component_context_dir:
+      default: "./"
+      description: "Working directory in which this Component will execute"
+      regex: ^([a-z.][a-zA-Z0-9-_/]+)?$
+      type: string
+    job_name_prefix:
+      default: ""
+      description: "Prefix for all component jobs"
+      regex: ^([a-z][a-z0-9-]+::)*$
+      type: string
+    job_stage:
+      default: "security-dynamic-analysis"
+      description: "Pipeline stage in which jobs are run"
+      type: string
+---
+include:
+  - local: /templates/shared/common.yml
+    inputs:
+      component_context_dir: "$[[ inputs.component_context_dir ]]"
+      job_name_prefix: "$[[ inputs.job_name_prefix ]]"
+      job_stage: "$[[ inputs.job_stage ]]"
+      _component_image: "$CI_TEMPLATE_REGISTRY_HOST/dwp/engineering/pipeline-solutions/gitlab/components/java:$[[ component.sha ]]-jdk$[[ inputs.java_version ]]"
+
+# API Fuzzer
+"$[[ inputs.job_name_prefix ]]java::security-dynamic::api-fuzzer":
+  extends: ".$[[ inputs.job_name_prefix ]]java::common"
+  needs:
+    - job: "$[[ inputs.job_name_prefix ]]java::docker::build"
+      optional: true
+  rules:
+    - if: '"$[[ inputs.run_api_fuzzer ]]" == "true"'
+  script: |
+    echo "Running API fuzzing tests..."
+
+# DAST API
+"$[[ inputs.job_name_prefix ]]java::security-dynamic::dast-api":
+  extends: ".$[[ inputs.job_name_prefix ]]java::common"
+  needs:
+    - job: "$[[ inputs.job_name_prefix ]]java::docker::build"
+      optional: true
+  rules:
+    - if: '"$[[ inputs.run_dast_api ]]" == "true"'
+  script: |
+    echo "Running DAST API security tests..."

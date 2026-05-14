@@ -1,0 +1,27 @@
+.venv/
+coverage/
+
+# Downloads
+downloads/
+
+# Maven cache
+.m2-local/
+.mvn-test-cache/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+report.xml
+
+# Generated vendor checksums
+.vendor-checksums
+
+# Code quality reports
+gl-code-quality*.json
