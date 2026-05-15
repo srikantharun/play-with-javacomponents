@@ -17,24 +17,30 @@ spec:
       description: "Prefix for all component jobs"
       regex: ^([a-z][a-z0-9-]+::)*$
       type: string
-    job_stage_install:
-      default: "install"
-      description: "Pipeline stage for dependency installation"
-      type: string
-    job_stage_build:
-      default: "build"
-      description: "Pipeline stage for build"
-      type: string
 ---
+# =============================================================================
+# java/build - Builds JAR file
+#
+# Prescribed behavior:
+#   - Dependencies resolved in 'install' stage
+#   - JAR built in 'build' stage using mvn package -DskipTests
+#   - Tests are NOT run here (use java/test component)
+#
+# Output: target/*.jar
+# =============================================================================
+
 include:
   - local: /templates/shared/common.yml
     inputs:
       component_context_dir: "$[[ inputs.component_context_dir ]]"
       job_name_prefix: "$[[ inputs.job_name_prefix ]]"
-      job_stage: "$[[ inputs.job_stage_install ]]"
+      job_stage: "install"
       _component_image: "$CI_TEMPLATE_REGISTRY_HOST/dwp/engineering/pipeline-solutions/gitlab/components/java:$[[ component.sha ]]-jdk$[[ inputs.java_version ]]"
 
-# Maven dependencies - install stage
+# =============================================================================
+# Resolve Dependencies (install stage)
+# =============================================================================
+
 "$[[ inputs.job_name_prefix ]]java::build::dependencies":
   artifacts:
     expire_in: 1 week
@@ -46,13 +52,16 @@ include:
       - $[[ inputs.component_context_dir ]]/.m2-local/
     when: always
   extends: ".$[[ inputs.job_name_prefix ]]java::common"
-  stage: $[[ inputs.job_stage_install ]]
+  stage: install
   script: |
     mvn dependency:go-offline \
       -Dmaven.repo.local=.m2-local \
       -s /component/shared/settings.xml
 
-# Maven package - build stage
+# =============================================================================
+# Build JAR (build stage)
+# =============================================================================
+
 "$[[ inputs.job_name_prefix ]]java::build::package":
   artifacts:
     expire_in: 1 week
@@ -67,7 +76,7 @@ include:
   needs:
     - job: "$[[ inputs.job_name_prefix ]]java::build::dependencies"
       optional: true
-  stage: $[[ inputs.job_stage_build ]]
+  stage: build
   script: |
     mvn package -DskipTests \
       -Dmaven.repo.local=.m2-local \

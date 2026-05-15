@@ -51,24 +51,12 @@ apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
   name: java-test
-  description: Unit and integration testing for Java
+  description: Unit, integration, Wiremock API, and mutation testing for Java
   tags:
     - test
     - junit
-spec:
-  type: ci-component
-  lifecycle: production
-  owner: group:devx-working-group
----
-apiVersion: backstage.io/v1alpha1
-kind: Component
-metadata:
-  name: java-api-test
-  description: API testing with Wiremock
-  tags:
-    - api
     - wiremock
-    - integration-test
+    - pitest
 spec:
   type: ci-component
   lifecycle: production
