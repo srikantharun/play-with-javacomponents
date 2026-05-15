@@ -1,0 +1,27 @@
+# =============================================================================
+# Integration tests - run component in real GitLab pipelines
+# =============================================================================
+
+# Test java/build component with a sample Java project
+test-javabuild-component:
+  stage: test
+  trigger:
+    include:
+      - local: test-pipelines/javabuild/.gitlab-ci.yml
+    strategy: depend
+  rules:
+    - changes:
+        - templates/build.yml
+        - templates/shared/**/*
+
+# Test java/test component
+test-javatest-component:
+  stage: test
+  trigger:
+    include:
+      - local: test-pipelines/javatest/.gitlab-ci.yml
+    strategy: depend
+  rules:
+    - changes:
+        - templates/test.yml
+        - templates/shared/**/*
