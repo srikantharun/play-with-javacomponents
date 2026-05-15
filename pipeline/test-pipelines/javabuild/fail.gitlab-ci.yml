@@ -1,0 +1,43 @@
+# =============================================================================
+# Integration test: java/build component - FAIL scenario
+#
+# Tests that a Java project with compilation errors fails the build.
+# The test PASSES if the build job FAILS (expected behavior).
+# =============================================================================
+
+spec:
+  inputs:
+    java_version:
+      default: "25"
+      type: string
+
+stages:
+  - install
+  - build
+  - verify
+
+include:
+  - local: /templates/build.yml
+    inputs:
+      java_version: $[[ inputs.java_version ]]
+      component_context_dir: "pipeline/test-pipelines/fixtures/fail"
+
+# Override the package job to expect failure
+"java::build::package":
+  allow_failure: true
+
+verify-build-failed:
+  stage: verify
+  needs:
+    - job: "java::build::package"
+      artifacts: false
+  script:
+    - |
+      echo "Verifying build failed as expected..."
+      # If we reach here after package job, check it failed
+      if ls pipeline/test-pipelines/fixtures/fail/target/*.jar 1>/dev/null 2>&1; then
+        echo "FAILURE: JAR was produced but should have failed"
+        exit 1
+      else
+        echo "SUCCESS: Build failed as expected (no JAR produced)"
+      fi

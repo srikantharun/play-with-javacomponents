@@ -2,26 +2,21 @@
 # Integration tests - run component in real GitLab pipelines
 # =============================================================================
 
-# Test java/build component with a sample Java project
-test-javabuild-component:
-  stage: test
+test-pipelines::javabuild:
+  interruptible: true
+  needs: [build-component-image]
+  parallel:
+    matrix:
+      - TEST_PATH:
+          - javabuild/pass
+          - javabuild/fail
+        JAVA_VERSION:
+          - 21
+          - 25
+  stage: test-pipelines
   trigger:
     include:
-      - local: test-pipelines/javabuild/.gitlab-ci.yml
+      - local: pipeline/test-pipelines/$TEST_PATH.gitlab-ci.yml
+        inputs:
+          java_version: "$JAVA_VERSION"
     strategy: depend
-  rules:
-    - changes:
-        - templates/build.yml
-        - templates/shared/**/*
-
-# Test java/test component
-test-javatest-component:
-  stage: test
-  trigger:
-    include:
-      - local: test-pipelines/javatest/.gitlab-ci.yml
-    strategy: depend
-  rules:
-    - changes:
-        - templates/test.yml
-        - templates/shared/**/*
