@@ -6,12 +6,12 @@ test-sources:
   stage: test
   image: bats/bats:latest
   script:
-    - bats test-sources/
+    - bats tests/
   rules:
     - changes:
         - src/**/*.sh
-        - test-sources/**/*.bats
+        - tests/**/*.bats
   artifacts:
     when: always
     reports:
-      junit: test-sources/report.xml
+      junit: tests/report.xml
