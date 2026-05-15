@@ -1,0 +1,42 @@
+# =============================================================================
+# Integration test: java/lint component - FAIL scenario
+#
+# Tests that code with violations fails lint checks.
+# The test PASSES if lint jobs exit with violation codes (211, 212).
+# =============================================================================
+
+spec:
+  inputs:
+    java_version:
+      default: "25"
+      type: string
+
+stages:
+  - code-analysis
+  - verify
+
+include:
+  - local: /templates/lint.yml
+    inputs:
+      java_version: $[[ inputs.java_version ]]
+      component_context_dir: "pipeline/test-pipelines/fixtures/lint-fail"
+
+verify-lint-found-violations:
+  stage: verify
+  needs:
+    - job: "java::lint::checkstyle"
+      artifacts: true
+  script:
+    - |
+      echo "Verifying lint found violations..."
+      if [ -f "pipeline/test-pipelines/fixtures/lint-fail/target/checkstyle-result.xml" ]; then
+        if grep -q "<error" "pipeline/test-pipelines/fixtures/lint-fail/target/checkstyle-result.xml"; then
+          echo "SUCCESS: Lint correctly found violations"
+        else
+          echo "FAILURE: No violations found in checkstyle report"
+          exit 1
+        fi
+      else
+        echo "FAILURE: No checkstyle report generated"
+        exit 1
+      fi

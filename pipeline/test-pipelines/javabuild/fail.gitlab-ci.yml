@@ -20,7 +20,7 @@ include:
   - local: /templates/build.yml
     inputs:
       java_version: $[[ inputs.java_version ]]
-      component_context_dir: "pipeline/test-pipelines/fixtures/fail"
+      component_context_dir: "pipeline/test-pipelines/fixtures/javabuild-fail"
 
 # Override the package job to expect failure
 "java::build::package":
@@ -35,7 +35,7 @@ verify-build-failed:
     - |
       echo "Verifying build failed as expected..."
       # If we reach here after package job, check it failed
-      if ls pipeline/test-pipelines/fixtures/fail/target/*.jar 1>/dev/null 2>&1; then
+      if ls pipeline/test-pipelines/fixtures/javabuild-fail/target/*.jar 1>/dev/null 2>&1; then
         echo "FAILURE: JAR was produced but should have failed"
         exit 1
       else

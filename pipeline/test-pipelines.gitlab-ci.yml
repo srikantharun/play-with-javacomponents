@@ -1,13 +1,17 @@
 # =============================================================================
-# Integration tests - run component in real GitLab pipelines
+# Integration tests - run components in real GitLab pipelines
+#
+# Tests all components (lint, javabuild, etc.) across Java versions.
 # =============================================================================
 
-test-pipelines::javabuild:
+test-pipelines:
   interruptible: true
   needs: [build-component-image]
   parallel:
     matrix:
       - TEST_PATH:
+          - lint/pass
+          - lint/fail
           - javabuild/pass
           - javabuild/fail
         JAVA_VERSION:

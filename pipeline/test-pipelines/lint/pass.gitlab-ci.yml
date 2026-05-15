@@ -1,0 +1,29 @@
+# =============================================================================
+# Integration test: java/lint component - PASS scenario
+#
+# Tests that valid Java code passes all lint checks.
+# =============================================================================
+
+spec:
+  inputs:
+    java_version:
+      default: "25"
+      type: string
+
+stages:
+  - code-analysis
+  - verify
+
+include:
+  - local: /templates/lint.yml
+    inputs:
+      java_version: $[[ inputs.java_version ]]
+      component_context_dir: "pipeline/test-pipelines/fixtures/lint-pass"
+
+verify-lint-passed:
+  stage: verify
+  needs:
+    - job: "java::lint::checkstyle"
+    - job: "java::lint::spotbugs"
+  script:
+    - echo "SUCCESS: All lint checks passed"

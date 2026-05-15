@@ -19,7 +19,7 @@ include:
   - local: /templates/build.yml
     inputs:
       java_version: $[[ inputs.java_version ]]
-      component_context_dir: "pipeline/test-pipelines/fixtures/pass"
+      component_context_dir: "pipeline/test-pipelines/fixtures/javabuild-pass"
 
 verify-jar-produced:
   stage: verify
@@ -29,9 +29,9 @@ verify-jar-produced:
   script:
     - |
       echo "Verifying JAR was produced..."
-      if ls pipeline/test-pipelines/fixtures/pass/target/*.jar 1>/dev/null 2>&1; then
+      if ls pipeline/test-pipelines/fixtures/javabuild-pass/target/*.jar 1>/dev/null 2>&1; then
         echo "SUCCESS: JAR file found"
-        ls -la pipeline/test-pipelines/fixtures/pass/target/*.jar
+        ls -la pipeline/test-pipelines/fixtures/javabuild-pass/target/*.jar
       else
         echo "FAILURE: No JAR file found"
         exit 1
