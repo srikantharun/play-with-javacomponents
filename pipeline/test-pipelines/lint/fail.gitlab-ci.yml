@@ -1,42 +1,49 @@
-# =============================================================================
-# Integration test: java/lint component - FAIL scenario
-#
-# Tests that code with violations fails lint checks.
-# The test PASSES if lint jobs exit with violation codes (211, 212).
-# =============================================================================
-
 spec:
   inputs:
     java_version:
-      default: "25"
       type: string
+      description: Major JDK version to use (LTS only)
+---
+
+workflow:
+  name: "lint (failing tests, JDK$[[ inputs.java_version ]])"
+  rules:
+    - when: always
 
 stages:
-  - code-analysis
-  - verify
+  - test
+  - assert
 
 include:
-  - local: /templates/lint.yml
+  - component: $CI_SERVER_FQDN/$CI_PROJECT_PATH/lint@$CI_COMMIT_SHA
     inputs:
-      java_version: $[[ inputs.java_version ]]
-      component_context_dir: "pipeline/test-pipelines/fixtures/lint-fail"
+      java_version: "$[[ inputs.java_version | expand_vars ]]"
+      job_stage: test
+      component_context_dir: "pipeline/test-pipelines/lint/fixtures/fail"
 
-verify-lint-found-violations:
-  stage: verify
-  needs:
-    - job: "java::lint::checkstyle"
-      artifacts: true
-  script:
-    - |
-      echo "Verifying lint found violations..."
-      if [ -f "pipeline/test-pipelines/fixtures/lint-fail/target/checkstyle-result.xml" ]; then
-        if grep -q "<error" "pipeline/test-pipelines/fixtures/lint-fail/target/checkstyle-result.xml"; then
-          echo "SUCCESS: Lint correctly found violations"
-        else
-          echo "FAILURE: No violations found in checkstyle report"
-          exit 1
-        fi
-      else
-        echo "FAILURE: No checkstyle report generated"
-        exit 1
-      fi
+# Need to override Component jobs to remove the Code Quality report, otherwise
+# it gets reported in this Component's own CI pipeline MR dashboards.
+java::lint::checkstyle:
+  artifacts:
+    reports:
+      codequality: nullfile.json
+
+java::lint::spotbugs:
+  artifacts:
+    reports:
+      codequality: nullfile.json
+
+# Assertions
+assert::fail::checkstyle:
+  stage: assert
+  image: nexus.nonprod.dwpcloud.uk/docker/chainguard/curl:latest-dev
+  tags:
+    - dwp-aws-x86-linux-l
+  script: pipeline/test-pipelines/lint/assert.fail.checkstyle.sh "pipeline/test-pipelines/lint/fixtures/fail"
+
+assert::fail::spotbugs:
+  stage: assert
+  image: nexus.nonprod.dwpcloud.uk/docker/chainguard/curl:latest-dev
+  tags:
+    - dwp-aws-x86-linux-l
+  script: pipeline/test-pipelines/lint/assert.fail.spotbugs.sh "pipeline/test-pipelines/lint/fixtures/fail"

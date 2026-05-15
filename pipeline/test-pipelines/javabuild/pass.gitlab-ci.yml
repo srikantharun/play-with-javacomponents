@@ -1,38 +1,33 @@
-# =============================================================================
-# Integration test: java/build component - PASS scenario
-#
-# Tests that a valid Java project builds successfully and produces a JAR.
-# =============================================================================
-
 spec:
   inputs:
     java_version:
-      default: "25"
       type: string
+      description: Major JDK version to use (LTS only)
+---
+
+workflow:
+  name: "javabuild (passing tests, JDK$[[ inputs.java_version ]])"
+  rules:
+    - when: always
 
 stages:
   - install
   - build
-  - verify
+  - assert
 
 include:
-  - local: /templates/build.yml
+  - component: $CI_SERVER_FQDN/$CI_PROJECT_PATH/build@$CI_COMMIT_SHA
     inputs:
-      java_version: $[[ inputs.java_version ]]
-      component_context_dir: "pipeline/test-pipelines/fixtures/javabuild-pass"
+      java_version: "$[[ inputs.java_version | expand_vars ]]"
+      component_context_dir: "pipeline/test-pipelines/javabuild/fixtures/pass"
 
-verify-jar-produced:
-  stage: verify
+# Assertions
+assert::pass::jar-produced:
+  stage: assert
+  image: nexus.nonprod.dwpcloud.uk/docker/chainguard/curl:latest-dev
+  tags:
+    - dwp-aws-x86-linux-l
   needs:
     - job: "java::build::package"
       artifacts: true
-  script:
-    - |
-      echo "Verifying JAR was produced..."
-      if ls pipeline/test-pipelines/fixtures/javabuild-pass/target/*.jar 1>/dev/null 2>&1; then
-        echo "SUCCESS: JAR file found"
-        ls -la pipeline/test-pipelines/fixtures/javabuild-pass/target/*.jar
-      else
-        echo "FAILURE: No JAR file found"
-        exit 1
-      fi
+  script: pipeline/test-pipelines/javabuild/assert.pass.jar-produced.sh "pipeline/test-pipelines/javabuild/fixtures/pass"
